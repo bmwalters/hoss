@@ -15,7 +15,7 @@ def test_check_page_alloc():
 
 @test(20, "Page management", parent=test_jos)
 def test_check_page():
-    r.match(r"check_page\(\) succeeded!")
+    r.match(r"page_check\(\) succeeded!")
 
 @test(20, "Kernel page directory", parent=test_jos)
 def test_check_kern_pgdir():
