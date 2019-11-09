@@ -33,7 +33,7 @@ static struct Env *env_free_list;	// Free environment list
 // Set up global descriptor table (GDT) with separate segments for
 // kernel mode and user mode.  Segments serve many purposes on the x86.
 // We don't use any of their memory-mapping capabilities, but we need
-// them to switch privilege levels. 
+// them to switch privilege levels.
 //
 // The kernel and user segments are identical except for the DPL.
 // To load the SS register, the CPL must equal the DPL.  Thus,
@@ -182,7 +182,7 @@ env_setup_vm(struct Env *e)
 	//    - The VA space of all envs is identical above UTOP
 	//	(except at UVPT, which we've set below).
 	//	See inc/memlayout.h for permissions and layout.
-	//	Hint: Figure out which entry in the pml4e maps addresses 
+	//	Hint: Figure out which entry in the pml4e maps addresses
 	//	      above UTOP.
 	//	(Make sure you got the permissions right in Lab 2.)
 	//    - The initial VA below UTOP is empty.
@@ -279,7 +279,7 @@ env_guest_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_status = ENV_RUNNABLE;
 	e->env_runs = 0;
 	e->env_vmxinfo.vcpunum = vcpu_count++;
-    	cprintf("VCPUNUM allocated: %d\n", e->env_vmxinfo.vcpunum);
+	cprintf("VCPUNUM allocated: %d\n", e->env_vmxinfo.vcpunum);
 
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
 
@@ -301,8 +301,8 @@ void env_guest_free(struct Env *e) {
 	// Free IO bitmaps page.
 	page_decref(pa2page(PADDR(e->env_vmxinfo.io_bmap_a)));
 	page_decref(pa2page(PADDR(e->env_vmxinfo.io_bmap_b)));
-    
-	// Free the host pages that were allocated for the guest and 
+
+	// Free the host pages that were allocated for the guest and
 	// the EPT tables itself.
 	free_guest_mem(e->env_pml4e);
 
@@ -498,7 +498,7 @@ env_free(struct Env *e)
 	uint64_t pdeno, pteno;
 	physaddr_t pa;
 
-#ifndef VMM_GUEST 
+#ifndef VMM_GUEST
 	if(e->env_type == ENV_TYPE_GUEST) {
 		env_guest_free(e);
 		return;
