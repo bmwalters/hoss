@@ -126,8 +126,21 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 void
 env_init(void)
 {
+	size_t i;
+	struct Env *last = NULL;
+
 	// Set up envs array
-	// LAB 3: Your code here.
+	// LAB 3
+	for (i = 0; i < NENV; i++) {
+		envs[i].env_id = 0;
+		envs[i].env_status = ENV_FREE;
+		envs[i].env_link = NULL;
+		if (last)
+			last->env_link = &envs[i];
+		else
+			env_free_list = &envs[i];
+		last = &envs[i];
+	}
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -193,7 +206,15 @@ env_setup_vm(struct Env *e)
 	//	pp_ref for env_free to work correctly.
 	//    - The functions in kern/pmap.h are handy.
 
-	// LAB 3: Your code here.
+	// LAB 3
+	p->pp_ref++;
+	e->env_pml4e = (pml4e_t *)page2kva(p);
+	e->env_cr3 = page2pa(p);
+
+	// copy pml4 entries above utop
+	for (i = PML4(UTOP); i < NPDENTRIES; i++) {
+		e->env_pml4e[i] = boot_pml4e[i];
+	}
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -402,13 +423,38 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 static void
 region_alloc(struct Env *e, void *va, size_t len)
 {
-	// LAB 3: Your code here.
-	// (But only if you need it for load_icode.)
+	struct PageInfo *page;
+	int res;
+	void *alloc_end;
+	void *alloc_cur;
+
+	// LAB 3
 	//
 	// Hint: It is easier to use region_alloc if the caller can pass
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	alloc_end = ROUNDUP(va + len, PGSIZE);
+	alloc_cur = ROUNDDOWN(va, PGSIZE);
+
+	for (; alloc_cur < alloc_end; alloc_cur += PGSIZE) {
+		page = page_alloc(0);
+
+		if (page == NULL) {
+			panic("region_alloc unable to allocate page\n");
+			return;
+		}
+
+		page->pp_ref++;
+
+		res = page_insert(e->env_pml4e, page, alloc_cur, PTE_U | PTE_W);
+
+		if (res < 0) {
+			panic("region_alloc unable to insert page: %e\n", res);
+			return;
+		}
+	}
 }
 
 //
@@ -464,12 +510,51 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
 
-	// LAB 3: Your code here
+	// LAB 3
+
+	struct Elf *elf;
+	struct Proghdr *ph;
+	struct Proghdr *eph;
+	struct PageInfo *stack_page;
+	int res;
+
+	elf = (struct Elf *)binary;
+
+	if (elf->e_magic != ELF_MAGIC) {
+		panic("load_icode elf header does not match magic\n");
+		return;
+	}
+
+	ph = (struct Proghdr *)(binary + elf->e_phoff);
+	eph = ph + elf->e_phnum;
+
+	// load page directory for proper virtual addresses
+	lcr3(e->env_cr3);
+
+	for (; ph < eph; ph++) {
+		if (ph->p_type != ELF_PROG_LOAD)
+			continue;
+
+		if (ph->p_filesz > ph->p_memsz) {
+			panic("load_icode elf p_filesz > p_memsz\n");
+			return;
+		}
+
+		region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+		memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
+		memset((void *)ph->p_va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
+	}
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
+	region_alloc(e, (void *)USTACKTOP - PGSIZE, PGSIZE);
 
-	// LAB 3: Your code here.
+	// back to kernel page tables
+	lcr3(boot_cr3);
+
+	// set entry point
 	e->elf = binary;
+	e->env_tf.tf_rip = elf->e_entry;
 }
 
 //
@@ -482,7 +567,18 @@ load_icode(struct Env *e, uint8_t *binary)
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
-	// LAB 3: Your code here.
+	// LAB 3
+	struct Env *e;
+
+	int res = env_alloc(&e, 0);
+
+	if (res < 0) {
+		panic("env_create failed during kernel initialization: %e", res);
+		return;
+	}
+
+	load_icode(e, binary);
+	e->env_type = type;
 
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
@@ -638,8 +734,18 @@ env_run(struct Env *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
-	// LAB 3: Your code here.
+	// LAB 3
+	if (e != curenv) {
+		if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
+			curenv->env_status = ENV_RUNNABLE;
+		}
 
-	panic("env_run not yet implemented");
+		curenv = e;
+		curenv->env_status = ENV_RUNNING;
+		curenv->env_runs++;
+
+		lcr3(curenv->env_cr3);
+	}
+
+	env_pop_tf(&curenv->env_tf);
 }
-
