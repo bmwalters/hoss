@@ -320,7 +320,7 @@ sys_vmx_incr_vmdisk_number() {
 	vmx_incr_vmdisk_number();
 }
 
-// Maps a page from the evnironment corresponding to envid into the guest vm 
+// Maps a page from the evnironment corresponding to envid into the guest vm
 // environments phys addr space.  Assuming the mapping is successful, this should
 // also increment the reference count of the mapped page.
 //
@@ -331,14 +331,14 @@ sys_vmx_incr_vmdisk_number() {
 //	-E_INVAL if srcva >= UTOP or srcva is not page-aligned,
 //		or guest_pa >= guest physical size or guest_pa is not page-aligned.
 //	-E_INVAL is srcva is not mapped in srcenvid's address space.
-//	-E_INVAL if perm is inappropriate 
+//	-E_INVAL if perm is inappropriate
 //	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
 //		address space.
-//	-E_NO_MEM if there's no memory to allocate any necessary page tables. 
+//	-E_NO_MEM if there's no memory to allocate any necessary page tables.
 //
-// Hint: The TA solution uses ept_map_hva2gpa().  A guest environment uses 
+// Hint: The TA solution uses ept_map_hva2gpa().  A guest environment uses
 //       env_pml4e to store the root of the extended page tables.
-// 
+//
 static int
 sys_ept_map(envid_t srcenvid, void *srcva,
 	    envid_t guest, void* guest_pa, int perm)
@@ -358,7 +358,7 @@ static envid_t
 		return -E_NO_VMX;
 	} else if ( !vmx_check_ept() ) {
 		return -E_NO_EPT;
-	} 
+	}
 	if ((r = env_guest_alloc(&e, curenv->env_id)) < 0)
 		return r;
 	e->env_status = ENV_NOT_RUNNABLE;
@@ -396,7 +396,7 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 		sys_vmx_incr_vmdisk_number();
 		return 0;
 #endif
-		
+
 	default:
 		return -E_NO_SYS;
 	}
