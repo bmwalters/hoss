@@ -848,6 +848,29 @@ mmio_map_region(physaddr_t pa, size_t size)
 
 static uintptr_t user_mem_check_addr;
 
+// LAB 3
+static int
+user_va_check(struct Env *env, const void *va, int perm)
+{
+	pte_t *pte;
+
+	if (va >= (void *)ULIM) {
+		return -E_FAULT;
+	}
+
+	pte = pml4e_walk(env->env_pml4e, va, 0);
+
+	if (pte == NULL) {
+		return -E_FAULT;
+	}
+
+	if ((*pte & (perm | PTE_P)) == (perm | PTE_P)) {
+		return 0;
+	}
+
+	return -E_FAULT;
+}
+
 //
 // Check that an environment is allowed to access the range of memory
 // [va, va+len) with permissions 'perm | PTE_P'.
@@ -869,9 +892,24 @@ static uintptr_t user_mem_check_addr;
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
-	// LAB 3: Your code here.
-	return 0;
+	// LAB 3
+	int res;
+	const void *check_end = ROUNDUP(va + len, PGSIZE);
+	const void *check_cur = ROUNDDOWN(va, PGSIZE);
 
+	for (; check_cur < check_end; check_cur += PGSIZE) {
+		res = user_va_check(env, check_cur, perm);
+		if (res < 0) {
+			user_mem_check_addr = (uintptr_t)check_cur;
+			// TODO: clean this up
+			if (user_mem_check_addr < (uintptr_t)va) {
+				user_mem_check_addr = (uintptr_t)va;
+			}
+			return res;
+		}
+	}
+
+	return 0;
 }
 
 //

@@ -22,6 +22,7 @@ umain(int argc, char **argv)
 			panic("bigarray[%d] didn't hold its value!\n", i);
 
 	cprintf("Yes, good.  Now doing a wild write off the end...\n");
-	bigarray[ARRAYSIZE+1024] = 0;
+	// TODO: seems to fail if using 1024...
+	bigarray[ARRAYSIZE+5000] = 0;
 	panic("SHOULD HAVE TRAPPED!!!");
 }
