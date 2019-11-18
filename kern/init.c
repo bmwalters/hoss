@@ -131,7 +131,7 @@ i386_init(void)
 	test_ept_map();
 #endif
 
-	ENV_CREATE(user_icode, ENV_TYPE_USER);
+	ENV_CREATE(user_hello, ENV_TYPE_USER);
 #endif // TEST*
 
 #ifdef LAB4

@@ -68,15 +68,89 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
+// LAB 3
+extern void _trap_DIVIDE(void);
+extern void _trap_DEBUG(void);
+extern void _trap_NMI(void);
+extern void _trap_BRKPT(void);
+extern void _trap_OFLOW(void);
+extern void _trap_BOUND(void);
+extern void _trap_ILLOP(void);
+extern void _trap_DEVICE(void);
+extern void _trap_DBLFLT(void);
+extern void _trap_COPROC(void);
+extern void _trap_TSS(void);
+extern void _trap_SEGNP(void);
+extern void _trap_STACK(void);
+extern void _trap_GPFLT(void);
+extern void _trap_PGFLT(void);
+extern void _trap_RES(void);
+extern void _trap_FPERR(void);
+extern void _trap_ALIGN(void);
+extern void _trap_MCHK(void);
+extern void _trap_SIMDERR(void);
+extern void _trap_default(void);
+
+extern void _trap_syscall(void);
+
+extern void _irq_timer(void);
+extern void _irq_kbd(void);
+extern void _irq_serial(void);
+extern void _irq_spurious(void);
+extern void _irq_ide(void);
+extern void _irq_error(void);
 
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
-	// LAB 3: Your code here.
+	// LAB 3
+	SETGATE(idt[T_DIVIDE], 0, GD_KT, _trap_DIVIDE, 0);
+	SETGATE(idt[T_DEBUG], 0, GD_KT, _trap_DEBUG, 0);
+	SETGATE(idt[T_NMI], 0, GD_KT, _trap_NMI, 0);
+	SETGATE(idt[T_BRKPT], 0, GD_KT, _trap_BRKPT, 3);
+	SETGATE(idt[T_OFLOW], 0, GD_KT, _trap_OFLOW, 0);
+	SETGATE(idt[T_BOUND], 0, GD_KT, _trap_BOUND, 0);
+	SETGATE(idt[T_ILLOP], 0, GD_KT, _trap_ILLOP, 0);
+	SETGATE(idt[T_DEVICE], 0, GD_KT, _trap_DEVICE, 0);
+	SETGATE(idt[T_DBLFLT], 0, GD_KT, _trap_DBLFLT, 0);
+	SETGATE(idt[9], 0, GD_KT, _trap_COPROC, 0);
+	SETGATE(idt[T_TSS], 0, GD_KT, _trap_TSS, 0);
+	SETGATE(idt[T_SEGNP], 0, GD_KT, _trap_SEGNP, 0);
+	SETGATE(idt[T_STACK], 0, GD_KT, _trap_STACK, 0);
+	SETGATE(idt[T_GPFLT], 0, GD_KT, _trap_GPFLT, 0);
+	SETGATE(idt[T_PGFLT], 0, GD_KT, _trap_PGFLT, 0);
+	SETGATE(idt[15], 0, GD_KT, _trap_RES, 0);
+	SETGATE(idt[T_FPERR], 0, GD_KT, _trap_FPERR, 0);
+	SETGATE(idt[T_ALIGN], 0, GD_KT, _trap_ALIGN, 0);
+	SETGATE(idt[T_MCHK], 0, GD_KT, _trap_MCHK, 0);
+	SETGATE(idt[T_SIMDERR], 0, GD_KT, _trap_SIMDERR, 0);
+	SETGATE(idt[20], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[21], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[22], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[23], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[24], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[25], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[26], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[27], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[28], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[29], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[30], 0, GD_KT, _trap_default, 0);
+	SETGATE(idt[31], 0, GD_KT, _trap_default, 0);
+
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, _trap_syscall, 3);
+
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, _irq_timer, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, _irq_kbd, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, _irq_serial, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, _irq_spurious, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_IDE], 0, GD_KT, _irq_ide, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_ERROR], 0, GD_KT, _irq_error, 0);
+
 	idt_pd.pd_lim = sizeof(idt)-1;
 	idt_pd.pd_base = (uint64_t)idt;
+
 	// Per-CPU setup
 	trap_init_percpu();
 }
@@ -235,6 +309,8 @@ trap(struct Trapframe *tf)
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
+
+	cprintf("Incoming TRAP frame at %p\n", tf);
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
