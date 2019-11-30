@@ -85,7 +85,6 @@ i386_init(void)
 	env_init();
 	trap_init();
 
-#ifdef LAB4
 #ifndef VMM_GUEST
 	// Lab 4 multiprocessor initialization functions
 	mp_init();
@@ -94,7 +93,7 @@ i386_init(void)
 
 	// Lab 4 multitasking initialization functions
 	pic_init();
-#endif // LAB4
+
 #ifdef LAB6
 #ifndef VMM_GUEST  // Does not work in guest mode
 	// Lab 6 hardware initialization functions
@@ -104,14 +103,14 @@ i386_init(void)
 #endif // LAB6
 
 	// Acquire the big kernel lock before waking up APs
-	// Your code here:
+	// LAB 4
+	lock_kernel();
 
-#ifdef LAB4
+	// LAB 4
 #ifndef VMM_GUEST
 	// Starting non-boot CPUs
 	boot_aps();
 #endif
-#endif // LAB4
 
 
 
@@ -134,16 +133,13 @@ i386_init(void)
 	ENV_CREATE(user_hello, ENV_TYPE_USER);
 #endif // TEST*
 
-#ifdef LAB4
+	// LAB 4
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
 
+	// LAB 4
 	// Schedule and run the first user environment!
 	sched_yield();
-#else
-	// We only have one user environment for now, so just run it.
-	env_run(&envs[0]);
-#endif
 }
 
 // While boot_aps is booting a given CPU, it communicates the per-core
@@ -194,8 +190,11 @@ mp_main(void)
 	// to start running processes on this CPU.  But make sure that
 	// only one CPU can enter the scheduler at a time!
 	//
-	// Your code here:
+	// LAB 4
+	lock_kernel();
+	sched_yield();
 
+	// LAB 4: Your code here:
 	// Remove this after you finish Exercise 4
 	for (;;);
 }

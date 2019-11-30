@@ -185,6 +185,7 @@ static void check_page_alloc(void);
 static void check_boot_pml4e(pml4e_t *pml4e, int lab);
 static physaddr_t check_va2pa(pde_t *pgdir, uintptr_t va);
 static void page_check(void);
+static void check_page_mmio(void);
 static void page_initpp(struct PageInfo *pp);
 // This simple physical memory allocator is used only while JOS is setting
 // up its virtual memory system.  page_alloc() is the real allocator.
@@ -331,8 +332,8 @@ x64_vm_init(void)
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
 
-	// LAB 2/3
-	check_boot_pml4e(boot_pml4e, 3);
+	// LAB 2/3/4
+	check_boot_pml4e(boot_pml4e, 4);
 
 	//////////////////////////////////////////////////////////////////////
 	// Permissions: kernel RW, user NONE
@@ -344,7 +345,7 @@ x64_vm_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	page_check();
-//	check_page_mmio();
+	check_page_mmio();
 	check_page_free_list(0);
 }
 
@@ -370,8 +371,15 @@ mem_init_mp(void)
 	//             Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	//
-	// LAB 4: Your code here:
+	// LAB 4
 
+	size_t i;
+	size_t kstacktop_i;
+
+	for (i = 0; i < NCPU; i++) {
+		kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		boot_map_region(boot_pml4e, kstacktop_i - KSTKSIZE, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
+	}
 }
 
 // --------------------------------------------------------------
@@ -420,7 +428,9 @@ page_init(void)
 		// answer: from EXTPHYSMEM to boot_alloc(0) are in use for existing data structures
 		if ((i == 0)
 			|| ((page2pa(&pages[i]) >= IOPHYSMEM) && (page2pa(&pages[i]) < PADDR(boot_alloc(0))))
-			|| ((page2pa(&pages[i]) >= PADDR(BOOT_PAGE_TABLE_START)) && (page2pa(&pages[i]) < PADDR(BOOT_PAGE_TABLE_END)))) {
+			|| ((page2pa(&pages[i]) >= PADDR(BOOT_PAGE_TABLE_START)) && (page2pa(&pages[i]) < PADDR(BOOT_PAGE_TABLE_END)))
+			// LAB 4
+			|| (page2pa(&pages[i]) == MPENTRY_PADDR)) {
 			pages[i].pp_ref = 1;
 			pages[i].pp_link = NULL;
 			continue;

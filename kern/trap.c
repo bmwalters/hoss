@@ -182,13 +182,16 @@ trap_init_percpu(void)
 	//
 	// LAB 4: Your code here:
 
-
 	int gd_tss = (GD_TSS0 >> 3) + cpunum()*2;
 
 	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP
 		- (KSTKSIZE + KSTKGAP) * cpunum();
 
-	SETTSS((struct SystemSegdesc64 *)((gdt_pd>>16)+40+cpunum()*16),STS_T64A, (uint64_t) (&thiscpu->cpu_ts),sizeof(struct Taskstate), 0);
+	SETTSS((struct SystemSegdesc64 *)((gdt_pd >> 16) + 40 + cpunum()*16),
+		STS_T64A,
+		(uint64_t)(&thiscpu->cpu_ts),
+		sizeof(struct Taskstate),
+		0);
 
 	// Load the TSS
 	ltr(gd_tss << 3);
@@ -326,6 +329,7 @@ trap(struct Trapframe *tf)
 	// sched_yield()
 	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED)
 		lock_kernel();
+
 	// Check that interrupts are disabled.  If this assertion
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
@@ -337,7 +341,9 @@ trap(struct Trapframe *tf)
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
-		// LAB 4: Your code here.
+		// LAB 4
+		lock_kernel();
+
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie

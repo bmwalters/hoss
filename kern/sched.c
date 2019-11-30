@@ -29,7 +29,11 @@ vmxon() {
 void
 sched_yield(void)
 {
-	struct Env *idle;
+	size_t i;
+	size_t i_current;
+	bool found_current = false;
+	struct Env *next_env = NULL;
+
 	// Implement simple round-robin scheduling.
 	//
 	// Search through 'envs' for an ENV_RUNNABLE environment in
@@ -45,7 +49,36 @@ sched_yield(void)
 	// no runnable environments, simply drop through to the code
 	// below to halt the cpu.
 
-	// LAB 4: Your code here.
+	// LAB 4
+	for (i = 0; i < NENV; i++) {
+		if ((found_current || !curenv) && (envs[i].env_status == ENV_RUNNABLE)) {
+			next_env = &envs[i];
+			break;
+		}
+
+		if (curenv && (envs[i].env_id == curenv->env_id)) {
+			found_current = true;
+			i_current = i;
+		}
+	}
+
+	if (!next_env) {
+		for (i = 0; i < i_current; i++) {
+			if (envs[i].env_status == ENV_RUNNABLE) {
+				next_env = &envs[i];
+				break;
+			}
+		}
+	}
+
+	if (!next_env && curenv && (curenv->env_status == ENV_RUNNING)) {
+		next_env = curenv;
+	}
+
+	if (next_env) {
+		env_run(next_env);
+	}
+
 	// sched_halt never returns
 	sched_halt();
 }

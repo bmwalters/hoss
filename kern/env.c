@@ -750,5 +750,6 @@ env_run(struct Env *e)
 		lcr3(curenv->env_cr3);
 	}
 
+	unlock_kernel();
 	env_pop_tf(&curenv->env_tf);
 }
