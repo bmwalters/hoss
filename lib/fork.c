@@ -52,12 +52,21 @@ pgfault(struct UTrapframe *utf)
 static int
 duppage(envid_t envid, unsigned pn)
 {
+	// LAB 4
 	int r;
+	int perm = uvpt[pn] & 0xFFF;
 
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
+	if (perm & (PTE_W | PTE_COW)) {
+		perm |= PTE_COW;
+	}
+
+	sys_page_map(0, src_pg, envid, dst_pg, perm);
+	sys_page_map(0, src_pg, 0, dst_pg, perm);
+
 	return 0;
 }
+
+extern void _pgfault_upcall(void);
 
 //
 // User-level fork with copy-on-write.
@@ -78,8 +87,53 @@ duppage(envid_t envid, unsigned pn)
 envid_t
 fork(void)
 {
-	// LAB 4: Your code here.
-	panic("fork not implemented");
+	envid_t id;
+	int res;
+	void *va;
+
+	// LAB 4
+	if ((res = set_pgfault_handler(pgfault)) < 0) {
+		return res;
+	}
+
+	if ((id = sys_exofork()) < 0) {
+		return id;
+	}
+
+	if (id == 0) {
+		// child
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return id;
+	}
+
+	// parent
+	for (va = 0; va < UTOP; va += PGSIZE) {
+		if ((uvpd[VPD(va)] & PTE_P) != PTE_P) {
+			continue;
+		}
+
+		if ((uvpt[VPN(va)] & (PTE_P | PTE_U)) != (PTE_P | PTE_U)) {
+			continue;
+		}
+
+		// TODO: handle read-only pages differently?
+		duppage(id, VPN(va));
+	}
+
+	if ((res = sys_page_alloc(id, (void *)(UXSTACKTOP - PGSIZE), PTE_W)) < 0) {
+		panic("fork: sys_page_alloc: %e\n", res);
+	}
+
+	if ((res = sys_env_set_pgfault_upcall(id, (void *)_pgfault_upcall)) < 0) {
+		panic("fork: sys_env_set_pgfault_upcall: %e\n", res);
+	}
+
+	if ((res = sys_env_set_status(id, ENV_RUNNABLE)) < 0) {
+		// should never happen since id was newly created
+		panic("fork: sys_env_set_status: %e\n", res);
+	}
+
+	return id;
 }
 
 // Challenge!
