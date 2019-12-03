@@ -36,7 +36,7 @@ _pgfault_upcall:
 // Call the C page fault handler.
 // function argument: pointer to UTF
 
-movq  %rsp,%rdi                // passing the function argument in rdi
+movq  %rsp, %rdi                // passing the function argument in rdi
 movabs _pgfault_handler, %rax
 call *%rax
 
@@ -66,19 +66,35 @@ call *%rax
 // may find that you have to rearrange your code in non-obvious
 // ways as registers become unavailable as scratch space.
 //
-// LAB 4: Your code here.
+// LAB 4
+	// traverse trap-time stack in rax
+	movq %rsp, %rax
+	addq $16, %rax // skip fault_va and err
+	addq $120, %rax // skip utf_regs (sizeof(PushRegs))
 
-    // Restore the trap-time registers.  After you do this, you
-    // can no longer modify any general-purpose registers.
-    // LAB 4: Your code here.
+	movq (%rax), %rdi // yoink the trap-time rip
+	addq $16, %rax // skip rip and eflags
 
-    // Restore eflags from the stack.  After you do this, you can
-    // no longer use arithmetic operations or anything else that
-    // modifies eflags.
-    // LAB 4: Your code here.
+	// store trap-time rip at top of trap-time stack
+	movq (%rax), %rsi // stack *rsi = *(stack **)rax
+	subq $8, %rsi
+	movq %rdi, (%rsi) // store trap-time rip
+	// put new trap-time rsp (rsi) in the utrapframe
+	movq %rsi, (%rax)
 
-    // Switch back to the adjusted trap-time stack.
-    // LAB 4: Your code here.
+	// Restore the trap-time registers.  After you do this, you
+	// can no longer modify any general-purpose registers.
+	addq $16, %rsp // pop fault_va and err
+	POPA_
+	addq $8, %rsp // pop trap-time rip
 
-    // Return to re-execute the instruction that faulted.
-    // LAB 4: Your code here.
+	// Restore eflags from the stack.  After you do this, you can
+	// no longer use arithmetic operations or anything else that
+	// modifies eflags.
+	popfq
+
+	// Switch back to the adjusted trap-time stack.
+	popq %rsp
+
+	// Return to re-execute the instruction that faulted.
+	ret

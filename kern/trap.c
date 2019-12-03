@@ -382,6 +382,8 @@ void
 page_fault_handler(struct Trapframe *tf)
 {
 	uint64_t fault_va;
+	void *ux_rsp;
+	struct UTrapframe utf;
 
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
@@ -427,12 +429,58 @@ page_fault_handler(struct Trapframe *tf)
 	//   To change what the user environment runs, modify 'curenv->env_tf'
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
-	// LAB 4: Your code here.
-
-	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
 		curenv->env_id, fault_va, tf->tf_rip);
 	print_trapframe(tf);
-	env_destroy(curenv);
-}
 
+	if (!curenv->env_pgfault_upcall) {
+		// Destroy the environment that caused the fault.
+		env_destroy(curenv);
+		return;
+	}
+
+	// LAB 4
+
+	if (!page_lookup(curenv->env_pml4e, (void *)(UXSTACKTOP - PGSIZE), NULL)) {
+		// TODO: any message here?
+		env_destroy(curenv);
+		return;
+	}
+
+	// build the user trapframe
+	utf.utf_fault_va = fault_va;
+	utf.utf_err = tf->tf_err;
+	utf.utf_regs = tf->tf_regs;
+	utf.utf_rip = tf->tf_rip;
+	utf.utf_eflags = tf->tf_eflags;
+	utf.utf_rsp = tf->tf_rsp;
+
+	// compute the user exception rsp
+	ux_rsp = (void *)UXSTACKTOP;
+
+	// if rsp is already within the user exception stack, push below it
+	if (tf->tf_rsp >= (UXSTACKTOP - PGSIZE) && tf->tf_rsp < UXSTACKTOP) {
+		ux_rsp = (void *)tf->tf_rsp;
+	}
+
+	// check before we might overflow the user exception stack
+	if ((ux_rsp - (8 + sizeof(struct UTrapframe))) < (void *)(UXSTACKTOP - PGSIZE)) {
+		// TODO: any message here?
+		env_destroy(curenv);
+		return;
+	}
+
+	// push an empty word
+	ux_rsp -= 8;
+	*((uint64_t *)ux_rsp) = 0;
+
+	// push the user trapframe
+	ux_rsp -= sizeof(struct UTrapframe);
+	*((struct UTrapframe *)ux_rsp) = utf;
+
+	// set up the registers to execute at the pgfault handler
+	tf->tf_rsp = (uint64_t)ux_rsp;
+	tf->tf_rip = (uint64_t)curenv->env_pgfault_upcall;
+
+	env_run(curenv);
+}
